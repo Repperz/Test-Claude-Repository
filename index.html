@@ -123,27 +123,44 @@ const BEN_HEAD = [
   '...bbbbbbbb...',
   '.....ssss.....',
 ];
-const BEN_TORSO = [
-  '...cccsscccc..',
-  '..ccccCoCcccc.',
-  '.cccccCoCccccc',
+// INEOS Christmas jumper from the work secret santa: a size too small for lanky Ben,
+// so his wrists and belly poke out. Knitted benzene ring on the chest. Merry Chemistmas.
+Object.assign(BEN_PAL, { J: '#c8232c', j: '#9a1a22', v: '#f4f4f4', G: '#2f8a3e' });
+const BEN_NECK = ['.....ssss.....'];
+const BEN_JUMPER = [
+  '..JJJJJJJJJJ..',
+  '.JvGvGvGvGvGJ.',
+  '.JJJJJvvJJJJJ.',
+  '.JJJJvJJvJJJJ.',
+  '.JJJJJvvJJJJJ.',
+  '.JJJJJJJJJJJJ.',
+  '.JvGvGvGvGvGJ.',
+  '.sjjjjjjjjjjs.',
 ];
-const BEN_ARMS = [
-  ['.cc.ccCoCcccss', '.ss.ccccccc...'],
-  ['ss.cccCoCccc..', '...cccccccc.ss'],
-];
-const BEN_BELT = ['...pppppppp...'];
+const BEN_BELLY = ['...sssSssss...'];
 const BEN_LEGS = [
-  ['..ppp...ppp...', '.ppp.....ppp..', '.pp.......pp..', 'kkk.......kkk.'],
-  ['....pppppp....', '....ppp.pp....', '....pp..pp....', '...kkk..kkk...'],
+  ['...pppppppp...', '...ppp..ppp...', '..ppp....ppp..', '..pp......pp..',
+   '.pp........pp.', '.pp........pp.', '.pp........pp.', 'kkk........kkk'],
+  ['...pppppppp...', '....ppp.pp....', '....pp..pp....', '....pp..pp....',
+   '....pp..pp....', '....pp..pp....', '....pp..pp....', '...kkk..kkk...'],
 ];
-const BEN_LEGS_JUMP = ['...pppppppp...', '...pp....pp...', '..kkk...kkk...', '..............'];
+const BEN_LEGS_JUMP = ['...pppppppp...', '..ppp....ppp..', '.pp........pp.', '.pp........pp.',
+  'kk..........kk', '..............', '..............', '..............'];
+const BEN_BODY = [...BEN_HEAD, ...BEN_NECK, ...BEN_JUMPER, ...BEN_BELLY];
+const BEN_H = BEN_BODY.length + 8;
+const JUMPER_TOP = BEN_HEAD.length + BEN_NECK.length;   // row where the jumper starts
 
-const benFrames = [];
-for (let i = 0; i < 4; i++)
-  benFrames.push(makeSprite([...BEN_HEAD, ...BEN_TORSO, ...BEN_ARMS[i >> 1], ...BEN_BELT, ...BEN_LEGS[i & 1]], BEN_PAL));
-const benJump = makeSprite([...BEN_HEAD, ...BEN_TORSO, ...BEN_ARMS[0], ...BEN_BELT, ...BEN_LEGS_JUMP], BEN_PAL);
+const benFrames = BEN_LEGS.map(legs => makeSprite([...BEN_BODY, ...legs], BEN_PAL));
+const benJump = makeSprite([...BEN_BODY, ...BEN_LEGS_JUMP], BEN_PAL);
 const benHead = makeSprite(BEN_HEAD, BEN_PAL);
+
+// Big Ben for title / end screens, with INEOS knitted across the chest
+function drawBigBen(g, x, y, sc) {
+  g.drawImage(benFrames[1], x, y, 14 * sc, BEN_H * sc);
+  g.fillStyle = BEN_PAL.J;
+  g.fillRect(x + 2 * sc, y + (JUMPER_TOP + 2) * sc, 10 * sc, 4 * sc);
+  drawText(g, 'INEOS', x + 7 * sc, y + (JUMPER_TOP + 2) * sc + Math.round((4 * sc - 5) / 2), '#ffffff', 1, 'center');
+}
 
 const pintSpr = makeSprite([
   '.wwwww...',
@@ -204,11 +221,6 @@ const sfx = {
 // ---------------------------------------------------------------------------
 // Game state
 // ---------------------------------------------------------------------------
-const MUM_TEXTS = [
-  'MUM: HAVE YOU EATEN?', 'MUM: TEXT WHEN HOME X', 'MUM: ARE YOU WEARING A COAT?',
-  'MUM: CALL YOUR NAN', 'MUM: NOT TOO LATE BEN!', 'MUM: WHO IS STEVE??',
-];
-const BOUNCER_LINES = ['NOT TONIGHT, PAL', 'NAME NOT ON THE LIST', 'BIT WOBBLY THERE MATE'];
 const QUEUE_LINES = ['OI! NO PUSHING IN!', 'BACK OF THE QUEUE!', 'WE WERE HERE FIRST!'];
 const SHOPS = [
   ['KEBABS', '#c0262d', '#ffd84a'], ['OFFIE', '#2a6b3a', '#ffffff'], ['BOOKIES', '#14457a', '#ffffff'],
@@ -221,17 +233,17 @@ const STARS = Array.from({ length: 40 }, () => ({ x: Math.random() * W * 2, y: M
 
 let state = 'title', t = 0, stateT = 0;
 let ben, ents, scroll = 0, speed, elapsed, pints, kebabs, dignity, drunk, nextSpawn;
-let toast, floaters, shake, pending, jumpBuffer, endReason, pubSpawned, warned, mumIntro, hicCD;
+let queueRiot, toast, floaters, shake, pending, jumpBuffer, endReason, pubSpawned, warned, mumIntro, hicCD;
 let best = 0;
 try { best = +localStorage.getItem('benBeersBest') || 0; } catch (e) {}
 
 function reset() {
-  ben = { x: 34, y: GROUND - 24, vy: 0, grounded: true, inv: 0, run: 0 };
+  ben = { x: 34, y: GROUND - BEN_H, vy: 0, grounded: true, inv: 0, run: 0 };
   ents = []; speed = 85; elapsed = 0;
   pints = 0; kebabs = 0; dignity = 3; drunk = 0;
   nextSpawn = 160; toast = null; floaters = []; shake = 0;
   pending = []; jumpBuffer = 0; endReason = ''; pubSpawned = false;
-  warned = false; mumIntro = false; hicCD = 2;
+  warned = false; mumIntro = false; hicCD = 2; queueRiot = false;
 }
 reset();
 
@@ -296,9 +308,10 @@ function spawn() {
     if (Math.random() < 0.5) ents.push(pint(x + n * 5 - 4, GROUND - 60));
     gap = 110;
   } else if (r < 0.66 && elapsed > 6) {
-    ents.push({ type: 'mum', x, y: GROUND - 40, w: 30, h: 12, mult: 1.6, ph: Math.random() * 6 });
+    const helen = Math.random() < 0.5;
+    ents.push({ type: helen ? 'helen' : 'mum', x, y: GROUND - 48, w: helen ? 38 : 30, h: 12, mult: 1.6, ph: Math.random() * 6 });
     sfx.text();
-    if (!mumIntro) { mumIntro = true; say("DON'T JUMP INTO MUM'S TEXTS!", '#7dffa0', 2.5); }
+    if (!mumIntro) { mumIntro = true; say("DON'T JUMP INTO THE TEXTS!", '#7dffa0', 2.5); }
     gap = 120;
   } else if (r < 0.76) {
     ents.push(kebab(x, Math.random() < 0.7 ? GROUND - 9 : GROUND - 48));
@@ -308,7 +321,7 @@ function spawn() {
     const high = Math.random() < 0.45;
     for (let i = 0; i < n; i++) {
       const arc = n > 1 ? Math.sin(i / (n - 1) * Math.PI) : 1;
-      ents.push(pint(x + i * 14, high ? GROUND - 38 - arc * 16 : GROUND - 12));
+      ents.push(pint(x + i * 14, high ? GROUND - 46 - arc * 14 : GROUND - 12));
     }
     gap = n * 14 + 30;
   }
@@ -333,7 +346,7 @@ function hurt(line, col) {
   ben.inv = 1.3; shake = 6;
   sfx.hit();
   say(line, col);
-  if (dignity <= 0) finish('thrown');
+  if (dignity <= 0) { queueRiot = true; finish('thrown'); }
 }
 
 function finish(reason) {
@@ -378,7 +391,7 @@ function update(dt) {
   // Physics
   ben.vy += GRAV * dt;
   ben.y += ben.vy * dt;
-  if (ben.y >= GROUND - 24) { ben.y = GROUND - 24; ben.vy = 0; ben.grounded = true; }
+  if (ben.y >= GROUND - BEN_H) { ben.y = GROUND - BEN_H; ben.vy = 0; ben.grounded = true; }
   ben.run += speed * dt;
   ben.inv = Math.max(0, ben.inv - dt);
 
@@ -401,7 +414,7 @@ function update(dt) {
 
   // Entities
   const sway = Math.sin(t * 3) * 2 * d;
-  const box = { x: ben.x + 3 + sway, y: ben.y + 3, w: 8, h: 20 };
+  const box = { x: ben.x + 3 + sway, y: ben.y + 3, w: 8, h: BEN_H - 4 };
   for (const e of ents) {
     e.x -= speed * (e.mult || 1) * dt;
     if (e.dead) continue;
@@ -420,12 +433,11 @@ function update(dt) {
       e.dead = true; kebabs++; drunk = Math.max(0, drunk - 1.5); sfx.kebab();
       floatText('KEBAB! SOBERING...', e.x + 5, e.y - 4, '#9cff7a');
     } else if (e.type === 'bouncer') {
-      hurt(BOUNCER_LINES[Math.floor(Math.random() * BOUNCER_LINES.length)], '#ff7a7a');
+      sfx.hit(); shake = 6; finish('thrown');
     } else if (e.type === 'queue') {
       hurt(QUEUE_LINES[Math.floor(Math.random() * QUEUE_LINES.length)], '#ffb36a');
-    } else if (e.type === 'mum') {
-      if (ben.inv <= 0) e.dead = true;
-      hurt(MUM_TEXTS[Math.floor(Math.random() * MUM_TEXTS.length)], '#7dffa0');
+    } else if (e.type === 'mum' || e.type === 'helen') {
+      sfx.hit(); shake = 6; finish(e.type);
     }
     if (state === 'over') break;
   }
@@ -557,12 +569,14 @@ function drawQueue(g, e) {
   drawText(g, 'KEBAB QUEUE', x0 + e.w / 2, GROUND - 31, '#ffd84a', 1, 'center', '#000');
 }
 
-function drawMum(g, e) {
+const TEXT_STYLE = { mum: ['MUM...', '#35c759', '#0a3a14'], helen: ['HELEN...', '#0a84ff', '#06264a'] };
+function drawTextMsg(g, e) {
+  const [label, fill, edge] = TEXT_STYLE[e.type];
   const x = Math.round(e.x), y = Math.round(e.y + Math.sin(t * 6 + e.ph) * 1.5);
-  g.fillStyle = '#0a3a14'; g.fillRect(x, y - 1, e.w, e.h + 2); g.fillRect(x - 1, y, e.w + 2, e.h);
-  g.fillStyle = '#35c759'; g.fillRect(x, y, e.w, e.h);
+  g.fillStyle = edge; g.fillRect(x, y - 1, e.w, e.h + 2); g.fillRect(x - 1, y, e.w + 2, e.h);
+  g.fillStyle = fill; g.fillRect(x, y, e.w, e.h);
   g.fillRect(x - 2, y + e.h - 2, 3, 3);
-  drawText(g, 'MUM...', x + 4, y + 4, '#ffffff');
+  drawText(g, label, x + 4, y + 4, '#ffffff');
   g.fillStyle = '#ff3b30'; g.fillRect(x + e.w - 3, y - 3, 5, 5);
   g.fillStyle = '#fff'; g.fillRect(x + e.w - 1, y - 2, 1, 3);
 }
@@ -598,11 +612,11 @@ function drawBen(g) {
   const sway = Math.sin(t * 3) * 2 * d;
   const x = Math.round(ben.x + sway), y = Math.round(ben.y);
   // shadow
-  const lift = Math.min(1, (GROUND - 24 - ben.y) / 60);
+  const lift = Math.min(1, (GROUND - BEN_H - ben.y) / 60);
   g.fillStyle = 'rgba(0,0,0,0.35)';
   const sw = Math.round(12 - lift * 6);
   g.fillRect(x + 7 - sw / 2, GROUND - 1, sw, 2);
-  const spr = ben.grounded ? benFrames[Math.floor(ben.run / 9) % 4] : benJump;
+  const spr = ben.grounded ? benFrames[Math.floor(ben.run / 10) % 2] : benJump;
   g.drawImage(spr, x, y);
   if (drunk >= 2) { // rosy cheeks
     g.fillStyle = '#e8606a';
@@ -622,7 +636,7 @@ function drawWorld(g) {
       const x = Math.round(e.x);
       if (e.type === 'bouncer') drawBouncer(g, x, Math.round(e.y));
       else if (e.type === 'queue') drawQueue(g, e);
-      else if (e.type === 'mum') drawMum(g, e);
+      else if (e.type === 'mum' || e.type === 'helen') drawTextMsg(g, e);
       else if (e.type === 'pint') {
         const y = Math.round(e.y + Math.sin(t * 4 + e.ph) * 1.5);
         g.drawImage(pintSpr, x, y);
@@ -687,6 +701,8 @@ function drawHUD(g) {
 }
 
 function rating() {
+  if (endReason === 'mum') return 'GROUNDED';
+  if (endReason === 'helen') return 'SLEEPING ON THE SOFA';
   if (endReason === 'thrown') return pints >= 6 ? 'BARRED (WORTH IT)' : 'BARRED';
   if (pints === 0) return 'DESIGNATED DRIVER';
   if (pints <= 2) return 'LIGHTWEIGHT';
@@ -696,45 +712,116 @@ function rating() {
   return 'HIGH STREET ROYALTY';
 }
 
+function bubble(g, x, y, lines, fill, ink, tailX) {
+  const w = Math.max(...lines.map(l => textW(l))) + 8, h = lines.length * 8 + 4;
+  g.fillStyle = fill;
+  g.fillRect(x, y, w, h); g.fillRect(x - 1, y + 1, w + 2, h - 2);
+  if (tailX != null) { g.fillRect(tailX, y + h, 4, 2); g.fillRect(tailX + 1, y + h + 2, 2, 2); }
+  lines.forEach((l, i) => drawText(g, l, x + 4, y + 3 + i * 8, ink));
+}
+
 function drawTitle(g) {
   g.fillStyle = 'rgba(5,5,20,0.72)'; g.fillRect(0, 0, W, H);
   const bob = Math.round(Math.sin(t * 3) * 2);
-  g.drawImage(benHead, W / 2 - 28, 30 + bob, 56, 56);
-  drawText(g, 'GET BEN', W / 2, 98, '#ffd84a', 3, 'center', '#7a2328');
-  drawText(g, 'TO THE BEERS', W / 2, 118, '#ffd84a', 2, 'center', '#7a2328');
+  drawBigBen(g, 46, 18 + bob, 2);
+  bubble(g, 86, 22, ['MERRY', 'CHEMISTMAS!'], '#ffffff', '#c8232c', 88);
+  drawText(g, 'GET BEN', W / 2, 92, '#ffd84a', 3, 'center', '#7a2328');
+  drawText(g, 'TO THE BEERS', W / 2, 112, '#ffd84a', 2, 'center', '#7a2328');
   const lines = [
     ['TAP ANYWHERE TO JUMP', '#ffffff'],
-    ['', ''],
     ['GRAB PINTS (+ GET DRUNKER)', '#ffd26a'],
     ['KEBABS SOBER YOU UP', '#9cff7a'],
     ['JUMP BOUNCERS & KEBAB QUEUES', '#ff9a7a'],
-    ["DON'T JUMP INTO MUM'S TEXTS", '#7dffa0'],
-    ['', ''],
+    ["DON'T JUMP INTO TEXTS", '#7dffa0'],
+    ['FROM MUM OR HELEN!', '#7dc4ff'],
     ['MAKE IT TO LAST ORDERS!', '#ffffff'],
   ];
-  lines.forEach(([s, c], i) => drawText(g, s, W / 2, 142 + i * 9, c, 1, 'center', '#000'));
-  g.drawImage(pintSpr, 38, 234); g.drawImage(kebabSpr, 58, 237);
-  drawBouncer(g, 82, 212);
-  g.fillStyle = '#35c759'; g.fillRect(106, 230, 24, 9); drawText(g, 'MUM', 112, 232, '#fff');
-  if (Math.floor(t * 2) % 2) drawText(g, 'TAP TO START', W / 2, 260, '#ffffff', 2, 'center', '#000');
+  lines.forEach(([s, c], i) => drawText(g, s, W / 2, 132 + i * 9, c, 1, 'center', '#000'));
+  g.drawImage(pintSpr, 18, 222); g.drawImage(kebabSpr, 34, 225);
+  drawBouncer(g, 54, 200);
+  drawTextMsg(g, { type: 'mum', x: 76, y: 218, w: 30, h: 12, ph: 0 });
+  drawTextMsg(g, { type: 'helen', x: 112, y: 218, w: 38, h: 12, ph: 2 });
+  if (Math.floor(t * 2) % 2) drawText(g, 'TAP TO START', W / 2, 250, '#ffffff', 2, 'center', '#000');
   if (best) drawText(g, `BEST: ${best} PINT${best === 1 ? "" : "S"}`, W / 2, 290, '#bbbbdd', 1, 'center');
 }
 
+// --- End-screen scenes (each fits in the band y=76..172) ---
+const bouncerSpr = document.createElement('canvas');
+bouncerSpr.width = 14; bouncerSpr.height = 31;
+drawBouncer(bouncerSpr.getContext('2d'), 0, 0);
+
+function sceneBouncer(g) {
+  // Little looping "gif": finger wag, sunglasses glint, speech typed out
+  const sc = 3, bx = 22, by = 78;
+  const sway = Math.floor(t * 2) % 2;
+  g.drawImage(bouncerSpr, bx + sway, by, 14 * sc, 31 * sc);
+  const wag = Math.floor(t * 6) % 2;
+  g.fillStyle = '#15151c'; g.fillRect(bx + 13 * sc + sway, by + 10 * sc, 6, 14);
+  g.fillStyle = '#a8714f';
+  g.fillRect(bx + 13 * sc + 1 + sway + (wag ? 3 : -2), by + 10 * sc - 9, 6, 9);
+  g.fillRect(bx + 13 * sc + 3 + sway + (wag ? 5 : -4), by + 10 * sc - 17, 3, 9);
+  if (Math.floor(t * 1.5) % 3 === 0) { g.fillStyle = '#ffffff'; g.fillRect(bx + 4 * sc + sway + Math.floor((t * 30) % 18), by + 4 * sc, 2, 2); }
+  const full = ['NOT TODAY,', 'PAL.'];
+  let n = Math.floor(((stateT * 12) % 30));
+  const shown = full.map(l => { const part = l.slice(0, Math.max(0, n)); n -= l.length; return part; });
+  bubble(g, 92, 84, shown.map((l, i) => l.padEnd(full[i].length)), '#ffffff', '#15151c', 92);
+  g.drawImage(benHead, 118, 132, 28, 28);
+}
+
+function sceneMum(g) {
+  bubble(g, 40, 80, ["MUM: I'M OUTSIDE", 'IN THE CAR X'], '#35c759', '#ffffff', 100);
+  const x = 50, y = 116, bounce = Math.floor(t * 4) % 2;
+  g.fillStyle = '#7a8a9a'; g.fillRect(x + 12, y + bounce, 44, 14); g.fillRect(x, y + 12 + bounce, 80, 18);
+  g.fillStyle = '#cfe8f5'; g.fillRect(x + 16, y + 3 + bounce, 16, 10); g.fillRect(x + 36, y + 3 + bounce, 16, 10);
+  g.drawImage(benHead, x + 37, y + 1 + bounce, 14, 14);
+  g.fillStyle = '#4a3020'; g.fillRect(x + 19, y + 5 + bounce, 10, 4); // mum's hair
+  g.fillStyle = '#ffe27a'; g.fillRect(x + 76, y + 16 + bounce, 4, 4);
+  g.fillStyle = '#ff5a5a'; g.fillRect(x, y + 16 + bounce, 3, 4);
+  g.fillStyle = '#1a1a22'; g.fillRect(x + 10, y + 26, 14, 14); g.fillRect(x + 56, y + 26, 14, 14);
+  g.fillStyle = '#888'; g.fillRect(x + 15, y + 31, 4, 4); g.fillRect(x + 61, y + 31, 4, 4);
+  drawText(g, 'SCHOOL RUN', x + 40, y + 19 + bounce, '#ffffff', 1, 'center');
+}
+
+function sceneHelen(g) {
+  bubble(g, 30, 78, ['HELEN: WE NEED', 'TO TALK.'], '#0a84ff', '#ffffff', 60);
+  const x = 56, y = 104;
+  g.fillStyle = '#8a2a20';                       // roof
+  for (let i = 0; i < 18; i++) g.fillRect(x + 34 - i * 2 - 4, y + i, i * 4 + 8, 1);
+  g.fillStyle = '#a0682e'; g.fillRect(x, y + 18, 68, 46);    // walls
+  g.fillStyle = '#7a4a1e'; for (let i = 0; i < 4; i++) g.fillRect(x, y + 26 + i * 10, 68, 1);
+  g.fillStyle = '#1a1010'; g.fillRect(x + 20, y + 30, 28, 34); g.fillRect(x + 22, y + 27, 24, 3); // door
+  g.drawImage(benHead, x + 20, y + 36 + (Math.floor(t * 2) % 2), 28, 28);
+  g.fillStyle = '#e8d8b0'; g.fillRect(x + 24, y + 20, 20, 7);
+  drawText(g, 'BEN', x + 34, y + 21, '#5a2a10', 1, 'center');
+  g.fillStyle = '#c0c0c8'; g.fillRect(x + 72, y + 58, 14, 6); g.fillRect(x + 70, y + 57, 18, 1); // dog bowl
+}
+
+function scenePub(g) {
+  drawBigBen(g, W / 2 - 14, 78, 2);
+  if (drunk >= 2) { g.fillStyle = '#e8606a'; g.fillRect(W / 2 - 10, 94, 4, 2); g.fillRect(W / 2 + 6, 94, 4, 2); }
+  g.drawImage(pintSpr, W / 2 + 16, 118 + (Math.floor(t * 3) % 2), 18, 18);
+}
+
+const ENDINGS = {
+  pub:    ['LAST ORDERS!', '#ffd84a', () => 'BEN MADE IT TO THE PUB', scenePub],
+  thrown: ['THROWN OUT!', '#ff5a5a', () => queueRiot ? 'KICKED OFF IN THE KEBAB QUEUE' : 'CAUGHT BY THE BOUNCER', sceneBouncer],
+  mum:    ["MUM'S HERE!", '#35c759', () => 'MUM CAME TO PICK YOU UP FROM SCHOOL', sceneMum],
+  helen:  ['DOGHOUSE!', '#4aa8ff', () => 'HELEN SAW THE STATE OF YOU', sceneHelen],
+};
+
 function drawOver(g) {
-  g.fillStyle = 'rgba(5,5,20,0.78)'; g.fillRect(0, 0, W, H);
-  const pub = endReason === 'pub';
-  drawText(g, pub ? 'LAST ORDERS!' : 'THROWN OUT!', W / 2, 46, pub ? '#ffd84a' : '#ff5a5a', 2, 'center', '#000');
-  drawText(g, pub ? 'BEN MADE IT TO THE PUB' : "BEN'S NIGHT IS OVER", W / 2, 66, '#ffffff', 1, 'center');
-  g.drawImage(benHead, W / 2 - 21, 80, 42, 42);
-  if (drunk >= 2) { g.fillStyle = '#e8606a'; g.fillRect(W / 2 - 15, 104, 6, 3); g.fillRect(W / 2 + 9, 104, 6, 3); }
+  g.fillStyle = 'rgba(5,5,20,0.82)'; g.fillRect(0, 0, W, H);
+  const [title, col, sub, scene] = ENDINGS[endReason];
+  drawText(g, title, W / 2, 40, col, 2, 'center', '#000');
+  drawText(g, sub(), W / 2, 60, '#ffffff', 1, 'center');
+  scene(g);
   const s = (n, w) => `${n} ${w}${n === 1 ? '' : 'S'}`;
-  drawText(g, s(pints, 'PINT') + ',', W / 2, 134, '#ffd26a', 2, 'center', '#000');
-  drawText(g, s(kebabs, 'KEBAB') + ',', W / 2, 152, '#9cff7a', 2, 'center', '#000');
-  drawText(g, `${dignity} DIGNITY`, W / 2, 170, dignity ? '#ff9ad5' : '#ff5a5a', 2, 'center', '#000');
-  drawText(g, 'VERDICT:', W / 2, 198, '#bbbbdd', 1, 'center');
-  drawText(g, rating(), W / 2, 208, '#ffffff', 1, 'center');
-  drawText(g, `BEST: ${best} PINT${best === 1 ? "" : "S"}`, W / 2, 226, '#bbbbdd', 1, 'center');
-  if (stateT > 1 && Math.floor(t * 2) % 2) drawText(g, 'TAP TO GO AGAIN', W / 2, 256, '#ffffff', 1, 'center', '#000');
+  drawText(g, s(pints, 'PINT') + ',', W / 2, 184, '#ffd26a', 2, 'center', '#000');
+  drawText(g, s(kebabs, 'KEBAB') + ',', W / 2, 200, '#9cff7a', 2, 'center', '#000');
+  drawText(g, `${dignity} DIGNITY`, W / 2, 216, dignity ? '#ff9ad5' : '#ff5a5a', 2, 'center', '#000');
+  drawText(g, 'VERDICT: ' + rating(), W / 2, 238, '#ffffff', 1, 'center');
+  drawText(g, `BEST: ${best} PINT${best === 1 ? "" : "S"}`, W / 2, 252, '#bbbbdd', 1, 'center');
+  if (stateT > 1 && Math.floor(t * 2) % 2) drawText(g, 'TAP TO GO AGAIN', W / 2, 274, '#ffffff', 1, 'center', '#000');
 }
 
 function render() {
